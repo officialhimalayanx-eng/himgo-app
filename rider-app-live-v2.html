@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HimGo — Rider</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #EFEFEF;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 12px;
+  }
+  .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6B6B6B; margin-bottom: 12px; }
+  .phone-frame { width: 100%; max-width: 380px; background: #000; border-radius: 2.5rem; padding: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+  .screen { background: #101010; border-radius: 2rem; overflow: hidden; height: 720px; display: flex; flex-direction: column; position: relative; color: #F2F2F2; }
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 24px 20px 12px; flex-shrink: 0; }
+  .back-btn { background: none; border: none; font-size: 20px; color: #F2F2F2; cursor: pointer; padding: 0; }
+  .topbar h1 { font-size: 17px; font-weight: 600; color: #F2F2F2; }
+  .map { position: relative; flex: 1; background: #181818; overflow: hidden; }
+  .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sheet { background: #1B1B1B; padding: 18px 20px 26px; border-radius: 24px 24px 0 0; margin-top: -24px; position: relative; z-index: 2; }
+  .field { display: flex; align-items: center; gap: 12px; background: #262626; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #C6FF3D; flex-shrink: 0; }
+  .dot.pin { background: #FF5C5C; border-radius: 3px; }
+  .field input, .field select { border: none; background: transparent; outline: none; font-size: 14px; color: #F2F2F2; flex: 1; font-family: inherit; }
+  .field input::placeholder { color: #7A7A7A; }
+  .field-wrap { position: relative; margin-bottom: 8px; }
+  .field-wrap .field { margin-bottom: 0; }
+  .suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #1F1F1F; border: 1px solid #2A2A2A; border-radius: 12px; overflow: hidden; z-index: 10; max-height: 240px; overflow-y: auto; }
+  .suggestion-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; font-size: 13px; color: #E6E6E6; cursor: pointer; }
+  .suggestion-item:not(:last-child) { border-bottom: 1px solid #262626; }
+  .suggestion-item .pin-ic { color: #C6FF3D; font-size: 12px; flex-shrink: 0; }
+  .primary-btn { width: 100%; background: #C6FF3D; color: #0E1A00; font-weight: 600; font-size: 14px; padding: 15px; border-radius: 12px; border: none; margin-top: 14px; cursor: pointer; }
+  .primary-btn:disabled { background: #3A3A3A; color: #7A7A7A; cursor: not-allowed; }
+  .link-btn { background: none; border: none; color: #9A9A9A; font-size: 12px; text-decoration: underline; cursor: pointer; width: 100%; text-align: center; margin-top: 12px; }
+  .meta { font-size: 12px; color: #9A9A9A; margin-bottom: 14px; }
+  .vehicle-option { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; border: 1px solid #2A2A2A; background: #1B1B1B; margin-bottom: 8px; cursor: pointer; text-align: left; font-family: inherit; }
+  .vehicle-option.active { border-color: #C6FF3D; background: #1E2411; }
+  .vehicle-icon { width: 44px; height: 44px; border-radius: 50%; background: #262626; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .vehicle-option.active .vehicle-icon { background: #C6FF3D; }
+  .vehicle-info { flex: 1; }
+  .vehicle-info .name { font-size: 14px; font-weight: 500; color: #F2F2F2; }
+  .vehicle-info .sub { font-size: 12px; color: #9A9A9A; }
+  .vehicle-fare { font-size: 14px; font-weight: 600; color: #C6FF3D; }
+  .fare-input-wrap { text-align: center; padding: 8px 0 18px; }
+  .fare-input-wrap .curr-label { font-size: 12px; color: #9A9A9A; margin-bottom: 6px; }
+  .fare-editor { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .step-btn { width: 40px; height: 40px; border-radius: 50%; background: #262626; border: none; color: #C6FF3D; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .fare-amount { font-size: 34px; font-weight: 700; color: #F2F2F2; min-width: 110px; text-align: center; }
+  .fare-hint { font-size: 11px; color: #7A7A7A; text-align: center; margin-top: 6px; }
+  .offers-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+  .offer-card { display: flex; align-items: center; gap: 12px; background: #1B1B1B; border: 1px solid #2A2A2A; border-radius: 12px; padding: 12px; cursor: pointer; }
+  .offer-card.active { border-color: #C6FF3D; background: #1E2411; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; background: #262626; color: #C6FF3D; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .offer-info { flex: 1; }
+  .offer-info .name { font-size: 14px; font-weight: 500; color: #F2F2F2; }
+  .offer-info .sub { font-size: 12px; color: #9A9A9A; margin-top: 1px; }
+  .offer-price { font-size: 15px; font-weight: 700; color: #C6FF3D; text-align: right; }
+  .center-msg { background: #1B1B1B; padding: 24px 20px; border-radius: 24px 24px 0 0; margin-top: -24px; position: relative; z-index: 2; text-align: center; }
+  .center-msg p { font-size: 14px; color: #B0B0B0; }
+  .pulse-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .pulse { width: 20px; height: 20px; border-radius: 50%; background: #C6FF3D; position: relative; }
+  .pulse::before { content: ''; position: absolute; inset: -20px; border-radius: 50%; border: 2px solid #C6FF3D; opacity: 0.5; animation: ping 1.8s ease-out infinite; }
+  @keyframes ping { from { transform: scale(0.3); opacity: 0.6; } to { transform: scale(2.5); opacity: 0; } }
+  .driver-row { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #262626; }
+  .driver-info { flex: 1; }
+  .driver-info .name { font-size: 14px; font-weight: 500; color: #F2F2F2; }
+  .trip-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; }
+  .trip-footer .status { font-size: 12px; color: #9A9A9A; }
+  .trip-footer .ride-fare { font-size: 14px; font-weight: 600; color: #C6FF3D; margin-top: 2px; }
+  .complete-btn { background: #C6FF3D; color: #0E1A00; font-size: 12px; font-weight: 600; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; }
+  .complete-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  .check-circle { width: 64px; height: 64px; border-radius: 50%; background: #1E2411; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 16px; }
+  .fare-label { font-size: 13px; color: #9A9A9A; margin-bottom: 4px; }
+  .fare-total { font-size: 32px; font-weight: 700; color: #C6FF3D; margin-bottom: 24px; }
+  .brand-strip { display: flex; align-items: center; gap: 6px; padding: 0 20px 4px; }
+  .brand-dot { width: 9px; height: 9px; border-radius: 50%; background: #C6FF3D; }
+  .brand-strip span { font-size: 12px; color: #7A7A7A; letter-spacing: 0.04em; }
+  .auth-tabs { display: flex; gap: 8px; padding: 0 20px 10px; }
+  .auth-tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; color: #9A9A9A; background: #1B1B1B; }
+  .auth-tab.active { background: #C6FF3D; color: #0E1A00; }
+  .error-msg { color: #FF6B6B; font-size: 12px; padding: 0 20px 8px; min-height: 14px; }
+  .center-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: #9A9A9A; font-size: 13px; }
+  .stars { display: flex; gap: 4px; justify-content: center; margin: 10px 0 24px; }
+  .star-btn { background: none; border: none; cursor: pointer; font-size: 26px; color: #3A3A3A; padding: 0; }
+  .star-btn.filled { color: #C6FF3D; }
+</style>
+</head>
+<body>
+
+<p class="label">HimGo Rider &middot; live</p>
+<div class="phone-frame">
+  <div class="screen" id="screen"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBvfAhIrX5gXvcZChz9HD238UftrjzkY_M",
+  authDomain: "himgo-758d2.firebaseapp.com",
+  projectId: "himgo-758d2",
+  storageBucket: "himgo-758d2.firebasestorage.app",
+  messagingSenderId: "962613964904",
+  appId: "1:962613964904:web:b527c75e385a833a740bdd",
+  measurementId: "G-G7LMF1KLB9"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const VEHICLE_TYPES = [
+  { id: "bike", name: "Bike", icon: "🛵", eta: "2 min", perKm: 20, base: 15 },
+  { id: "car", name: "Car", icon: "🚗", eta: "6 min", perKm: 45, base: 40 },
+];
+
+// Kathmandu Valley first, then major cities and towns across Nepal
+const PLACES = [
+  "New Baneshwor, Kathmandu", "Old Baneshwor, Kathmandu", "Koteshwor, Kathmandu",
+  "Thamel, Kathmandu", "Boudha, Kathmandu", "Chabahil, Kathmandu", "Gongabu, Kathmandu",
+  "Kalanki, Kathmandu", "Balaju, Kathmandu", "Sundhara, Kathmandu", "Ratnapark, Kathmandu",
+  "Maitighar, Kathmandu", "Tinkune, Kathmandu", "Sinamangal, Kathmandu", "Jorpati, Kathmandu",
+  "Budhanilkantha, Kathmandu", "Baluwatar, Kathmandu", "Naxal, Kathmandu", "Gaushala, Kathmandu",
+  "Kirtipur, Kathmandu",
+  "Patan, Lalitpur", "Pulchowk, Lalitpur", "Jawalakhel, Lalitpur", "Satdobato, Lalitpur",
+  "Ekantakuna, Lalitpur",
+  "Bhaktapur Durbar Square, Bhaktapur", "Suryabinayak, Bhaktapur",
+  "Lakeside, Pokhara", "Mahendrapul, Pokhara", "Chipledhunga, Pokhara",
+  "Bharatpur, Chitwan", "Sauraha, Chitwan",
+  "Biratnagar, Morang", "Itahari, Sunsari", "Dharan, Sunsari",
+  "Butwal, Rupandehi", "Siddharthanagar, Rupandehi",
+  "Nepalgunj, Banke", "Dhangadhi, Kailali", "Mahendranagar, Kanchanpur",
+  "Birgunj, Parsa", "Hetauda, Makwanpur", "Janakpur, Dhanusha",
+  "Tansen, Palpa", "Ghorahi, Dang", "Surkhet",
+  "Ilam Bazaar, Ilam", "Damak, Jhapa",
+];
+
+function matchPlaces(q) {
+  if (!q || !q.trim()) return [];
+  const lower = q.toLowerCase();
+  return PLACES.filter(p => p.toLowerCase().includes(lower)).slice(0, 6);
+}
+function estimateKm(pickup, drop) {
+  const seed = ((pickup||"").length * 7 + (drop||"").length * 13) % 12;
+  return Math.max(2, seed + 2);
+}
+function mapSvg(animate) {
+  return `<svg viewBox="0 0 400 400">
+    <path d="M0,80 H400" stroke="#242424" stroke-width="6"/>
+    <path d="M0,220 H400" stroke="#242424" stroke-width="10"/>
+    <path d="M60,0 V400" stroke="#242424" stroke-width="6"/>
+    <path d="M280,0 V400" stroke="#242424" stroke-width="8"/>
+    <path d="M0,340 H400" stroke="#242424" stroke-width="5"/>
+    <path d="M90,300 C150,260 180,180 260,110" stroke="#C6FF3D" stroke-width="4" stroke-dasharray="2 10" stroke-linecap="round" fill="none"/>
+    <circle cx="90" cy="300" r="7" fill="#C6FF3D"/>
+    <circle cx="260" cy="110" r="7" fill="#FF5C5C"/>
+    ${animate ? `<circle r="6" fill="#C6FF3D"><animateMotion dur="2.5s" repeatCount="indefinite" path="M90,300 C150,260 180,180 260,110"/></circle>` : ""}
+  </svg>`;
+}
+function brandStrip() { return `<div class="brand-strip"><div class="brand-dot"></div><span>HimGo</span></div>`; }
+function initials(name) { return (name||"?").split(" ").map(n => n[0]).join("").toUpperCase(); }
+
+let state = {
+  step: "loading", // loading, login, signup, home, vehicle, offer, matching, offers, trip, complete
+  user: null,
+  authError: "",
+  pickup: "New Baneshwor, Kathmandu", drop: "", pickupQuery: "", dropQuery: "", activeField: null,
+  vehicleType: "bike",
+  myFare: 0,
+  rideId: null,
+  rideData: null,
+  unsub: null,
+  myRating: 0,
+  ratingSubmitted: false,
+};
+
+function render() {
+  const el = document.getElementById("screen");
+  el.innerHTML = renderers[state.step]();
+  attach[state.step] && attach[state.step]();
+}
+
+const renderers = {
+  loading: () => `<div class="center-loading">Loading...</div>`,
+  login: () => `
+    ${brandStrip()}
+    <div class="topbar"><h1>Log In</h1></div>
+    <div class="auth-tabs">
+      <div class="auth-tab active">Log In</div>
+      <div class="auth-tab" id="toSignup">Sign Up</div>
+    </div>
+    <div class="error-msg">${state.authError}</div>
+    <div class="sheet" style="margin-top:0;border-radius:0;">
+      <div class="field"><input id="email" type="email" placeholder="Email"/></div>
+      <div class="field"><input id="password" type="password" placeholder="Password"/></div>
+      <button class="primary-btn" id="loginBtn">Log In</button>
+    </div>`,
+  signup: () => `
+    ${brandStrip()}
+    <div class="topbar"><h1>Sign Up</h1></div>
+    <div class="auth-tabs">
+      <div class="auth-tab" id="toLogin">Log In</div>
+      <div class="auth-tab active">Sign Up</div>
+    </div>
+    <div class="error-msg">${state.authError}</div>
+    <div class="sheet" style="margin-top:0;border-radius:0;">
+      <div class="field"><input id="name" type="text" placeholder="Full name"/></div>
+      <div class="field"><input id="email" type="email" placeholder="Email"/></div>
+      <div class="field"><input id="password" type="password" placeholder="Password (6+ characters)"/></div>
+      <button class="primary-btn" id="signupBtn">Create Account</button>
+    </div>`,
+  home: () => `
+    ${brandStrip()}
+    <div class="topbar"><h1>Where to?</h1><button class="back-btn" id="logoutBtn" style="margin-left:auto;font-size:11px;">Log Out</button></div>
+    <div class="map">${mapSvg(false)}</div>
+    <div class="sheet">
+      <div class="field-wrap">
+        <div class="field"><div class="dot"></div><input id="pickup" autocomplete="off" value="${state.pickup}" placeholder="Pickup location"/></div>
+        ${state.activeField === "pickup" && matchPlaces(state.pickupQuery).length ? `<div class="suggestions">${matchPlaces(state.pickupQuery).map(p => `<div class="suggestion-item" data-field="pickup" data-val="${p}"><span class="pin-ic">&#9679;</span>${p}</div>`).join("")}</div>` : ""}
+      </div>
+      <div class="field-wrap">
+        <div class="field"><div class="dot pin"></div><input id="drop" autocomplete="off" value="${state.drop}" placeholder="Where are you going?"/></div>
+        ${state.activeField === "drop" && matchPlaces(state.dropQuery).length ? `<div class="suggestions">${matchPlaces(state.dropQuery).map(p => `<div class="suggestion-item" data-field="drop" data-val="${p}"><span class="pin-ic">&#9673;</span>${p}</div>`).join("")}</div>` : ""}
+      </div>
+      <button class="primary-btn" id="searchBtn" ${state.drop.trim() ? "" : "disabled"}>Continue</button>
+    </div>`,
+  vehicle: () => {
+    const km = estimateKm(state.pickup, state.drop);
+    const opts = VEHICLE_TYPES.map(v => {
+      const fare = v.base + v.perKm * km;
+      const active = state.vehicleType === v.id;
+      return `<button class="vehicle-option ${active ? "active" : ""}" data-id="${v.id}">
+        <div class="vehicle-icon">${v.icon}</div>
+        <div class="vehicle-info"><div class="name">${v.name}</div><div class="sub">${v.eta} away</div></div>
+        <div class="vehicle-fare">Rs ${fare}</div>
+      </button>`;
+    }).join("");
+    return `
+      ${brandStrip()}
+      <div class="topbar"><button class="back-btn" id="backBtn">&#8592;</button><h1>Choose a vehicle</h1></div>
+      <div class="map">${mapSvg(false)}</div>
+      <div class="sheet">
+        <p class="meta">${km} km &middot; ${state.pickup.split(",")[0]} &rarr; ${state.drop.split(",")[0]}</p>
+        ${opts}
+        <button class="primary-btn" id="nextBtn">Continue</button>
+      </div>`;
+  },
+  offer: () => {
+    const km = estimateKm(state.pickup, state.drop);
+    const v = VEHICLE_TYPES.find(x => x.id === state.vehicleType);
+    const minFare = Math.round((v.base + v.perKm * km) / 5) * 5;
+    if (!state.myFare) state.myFare = minFare;
+    if (state.myFare < minFare) state.myFare = minFare;
+    const atMin = state.myFare <= minFare;
+    return `
+      ${brandStrip()}
+      <div class="topbar"><button class="back-btn" id="backBtn">&#8592;</button><h1>Set your fare</h1></div>
+      <div class="map">${mapSvg(false)}</div>
+      <div class="sheet">
+        <p class="meta">${v.name} &middot; ${km} km &middot; min Rs ${minFare}</p>
+        <div class="fare-input-wrap">
+          <div class="curr-label">Fare you'd like to offer</div>
+          <div class="fare-editor">
+            <button class="step-btn" id="minusBtn" ${atMin ? "disabled" : ""}>&minus;</button>
+            <div class="fare-amount">Rs ${state.myFare}</div>
+            <button class="step-btn" id="plusBtn">&plus;</button>
+          </div>
+          <p class="fare-hint">Cannot go below Rs ${minFare}</p>
+        </div>
+        <button class="primary-btn" id="sendOfferBtn">Send Offer</button>
+      </div>`;
+  },
+  matching: () => `
+    ${brandStrip()}
+    <div class="topbar"><h1>Sending offer to nearby drivers...</h1></div>
+    <div class="map">${mapSvg(false)}<div class="pulse-wrap"><div class="pulse"></div></div></div>
+    <div class="center-msg"><p>Your Rs ${state.myFare} offer has been sent to nearby drivers, waiting for a response...</p></div>`,
+  offers: () => {
+    const offers = (state.rideData && state.rideData.offers) || [];
+    const list = offers.map((o, i) => `
+      <div class="offer-card" data-i="${i}">
+        <div class="avatar">${initials(o.driverName)}</div>
+        <div class="offer-info"><div class="name">${o.driverName}</div><div class="sub">${VEHICLE_TYPES.find(v=>v.id===state.vehicleType).name} driver &middot; &#9733; ${(o.driverRating || 5).toFixed(1)}</div></div>
+        <div class="offer-price">Rs ${o.offerFare}</div>
+      </div>`).join("");
+    return `
+      ${brandStrip()}
+      <div class="topbar"><h1>Driver Offers</h1></div>
+      <div class="sheet" style="margin-top:0; border-radius:0; flex:1; overflow-y:auto;">
+        <p class="meta">${offers.length} driver(s) responded &middot; your offer Rs ${state.myFare}</p>
+        <div class="offers-list">${list || `<p style="color:#7A7A7A;font-size:13px;">No offers yet, please wait...</p>`}</div>
+      </div>`;
+  },
+  trip: () => {
+    const r = state.rideData;
+    const arriving = r && r.status === "arriving";
+    return `
+      ${brandStrip()}
+      <div class="topbar"><h1>${arriving ? "Driver is on the way" : "Trip in progress"}</h1></div>
+      <div class="map">${mapSvg(!arriving)}</div>
+      <div class="sheet">
+        <div class="driver-row">
+          <div class="avatar">${initials(r && r.acceptedDriverName)}</div>
+          <div class="driver-info"><div class="name">${r && r.acceptedDriverName || ""}</div></div>
+        </div>
+        <div class="trip-footer">
+          <div>
+            <div class="status">${arriving ? "Arriving in 2 min" : "Heading to destination"}</div>
+            <div class="ride-fare">Rs ${r && r.agreedFare}</div>
+          </div>
+        </div>
+      </div>`;
+  },
+  complete: () => `
+    ${brandStrip()}
+    <div class="topbar"><h1>Trip Complete</h1></div>
+    <div class="complete-body">
+      <div class="check-circle">✅</div>
+      <p class="fare-label">Total fare</p>
+      <p class="fare-total">Rs ${state.rideData && state.rideData.agreedFare}</p>
+      ${state.ratingSubmitted ? `
+        <p class="fare-label" style="margin-bottom:20px;">Thanks for rating your driver!</p>
+      ` : `
+        <p class="fare-label">Rate your driver</p>
+        <div class="stars">${[1,2,3,4,5].map(n => `<button class="star-btn ${n <= state.myRating ? "filled" : ""}" data-n="${n}">&#9733;</button>`).join("")}</div>
+      `}
+      <button class="primary-btn" id="restartBtn" style="margin-top:0">${state.ratingSubmitted ? "Book a new ride" : "Skip and book new ride"}</button>
+    </div>`
+};
+
+const attach = {
+  login: () => {
+    document.getElementById("toSignup").onclick = () => { state.authError=""; state.step="signup"; render(); };
+    document.getElementById("loginBtn").onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      try { await auth.signInWithEmailAndPassword(email, password); }
+      catch (e) { state.authError = e.message.replace("Firebase: ", ""); render(); }
+    };
+  },
+  signup: () => {
+    document.getElementById("toLogin").onclick = () => { state.authError=""; state.step="login"; render(); };
+    document.getElementById("signupBtn").onclick = async () => {
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!name) { state.authError = "Please enter your name"; render(); return; }
+      try {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        await db.collection("users").doc(cred.user.uid).set({ name, email, role: "rider", ratingSum: 0, ratingCount: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      } catch (e) { state.authError = e.message.replace("Firebase: ", ""); render(); }
+    };
+  },
+  home: () => {
+    document.getElementById("logoutBtn").onclick = () => auth.signOut();
+    document.getElementById("pickup").oninput = e => { state.pickup = e.target.value; state.pickupQuery = e.target.value; state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
+    document.getElementById("pickup").onfocus = () => { state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
+    document.getElementById("drop").oninput = e => { state.drop = e.target.value; state.dropQuery = e.target.value; state.activeField = "drop"; render(); document.getElementById("drop").focus(); document.getElementById("searchBtn").disabled = !state.drop.trim(); };
+    document.getElementById("drop").onfocus = () => { state.activeField = "drop"; render(); document.getElementById("drop").focus(); };
+    document.querySelectorAll(".suggestion-item").forEach(item => {
+      item.onclick = () => { const f = item.dataset.field; state[f] = item.dataset.val; state[f+"Query"] = item.dataset.val; state.activeField = null; render(); };
+    });
+    document.getElementById("searchBtn").onclick = () => { if (!state.drop.trim()) return; state.activeField = null; state.step = "vehicle"; render(); };
+  },
+  vehicle: () => {
+    document.getElementById("backBtn").onclick = () => { state.step = "home"; render(); };
+    document.querySelectorAll(".vehicle-option").forEach(btn => {
+      btn.onclick = () => { state.vehicleType = btn.dataset.id; state.myFare = 0; render(); };
+    });
+    document.getElementById("nextBtn").onclick = () => { state.myFare = 0; state.step = "offer"; render(); };
+  },
+  offer: () => {
+    document.getElementById("backBtn").onclick = () => { state.step = "vehicle"; render(); };
+    document.getElementById("minusBtn").onclick = () => {
+      const km = estimateKm(state.pickup, state.drop);
+      const v = VEHICLE_TYPES.find(x => x.id === state.vehicleType);
+      const minFare = Math.round((v.base + v.perKm * km) / 5) * 5;
+      state.myFare = Math.max(minFare, state.myFare - 5); render();
+    };
+    document.getElementById("plusBtn").onclick = () => { state.myFare += 5; render(); };
+    document.getElementById("sendOfferBtn").onclick = async () => {
+      const km = estimateKm(state.pickup, state.drop);
+      const docRef = await db.collection("rides").add({
+        riderId: state.user.uid,
+        riderName: state.user.displayName || "Rider",
+        pickup: state.pickup, drop: state.drop, distanceKm: km,
+        vehicleType: state.vehicleType,
+        riderOfferFare: state.myFare, status: "searching", offers: [],
+        acceptedDriverId: null, acceptedDriverName: null, agreedFare: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      state.rideId = docRef.id;
+      state.step = "matching";
+      render();
+      listenToRide();
+    };
+  },
+  matching: () => {},
+  offers: () => {
+    document.querySelectorAll(".offer-card").forEach(card => {
+      card.onclick = async () => {
+        const i = parseInt(card.dataset.i, 10);
+        const offer = state.rideData.offers[i];
+        await db.collection("rides").doc(state.rideId).update({
+          acceptedDriverId: offer.driverId, acceptedDriverName: offer.driverName,
+          agreedFare: offer.offerFare, status: "arriving",
+        });
+      };
+    });
+  },
+  trip: () => {},
+  complete: () => {
+    document.querySelectorAll(".star-btn").forEach(b => {
+      b.onclick = async () => {
+        state.myRating = parseInt(b.dataset.n, 10);
+        render();
+        const driverId = state.rideData.acceptedDriverId;
+        await db.collection("rides").doc(state.rideId).update({ riderRatingGiven: state.myRating });
+        await db.collection("users").doc(driverId).update({
+          ratingSum: firebase.firestore.FieldValue.increment(state.myRating),
+          ratingCount: firebase.firestore.FieldValue.increment(1),
+        });
+        state.ratingSubmitted = true;
+        render();
+      };
+    });
+    document.getElementById("restartBtn").onclick = () => {
+      if (state.unsub) state.unsub();
+      state = { ...state, step: "home", pickup: "New Baneshwor, Kathmandu", drop: "", pickupQuery: "", dropQuery: "", activeField: null, vehicleType: "bike", myFare: 0, rideId: null, rideData: null, unsub: null, myRating: 0, ratingSubmitted: false };
+      render();
+    };
+  }
+};
+
+function listenToRide() {
+  if (state.unsub) state.unsub();
+  state.unsub = db.collection("rides").doc(state.rideId).onSnapshot((snap) => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    state.rideData = data;
+    if (data.status === "searching" && (data.offers||[]).length > 0) state.step = "offers";
+    else if (data.status === "arriving" || data.status === "ongoing") state.step = "trip";
+    else if (data.status === "completed") state.step = "complete";
+    render();
+  });
+}
+
+auth.onAuthStateChanged((user) => {
+  state.user = user;
+  if (user) { state.step = "home"; render(); }
+  else { state.step = "login"; render(); }
+});
+
+render();
+</script>
+</body>
+</html>
