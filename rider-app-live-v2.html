@@ -378,35 +378,103 @@ const attach = {
     document.getElementById("nextBtn").onclick = () => { state.myFare = 0; state.step = "offer"; render(); };
   },
   offer: () => {
-    document.getElementById("backBtn").onclick = () => { state.step = "vehicle"; render(); };
-    document.getElementById("minusBtn").onclick = () => {
+  const backBtn = document.getElementById("backBtn");
+  const minusBtn = document.getElementById("minusBtn");
+  const plusBtn = document.getElementById("plusBtn");
+  const sendBtn = document.getElementById("sendOfferBtn");
+
+  if (backBtn) {
+    backBtn.onclick = () => {
+      state.step = "vehicle";
+      state.myFare = 0;
+      render();
+    };
+  }
+
+  if (minusBtn) {
+    minusBtn.onclick = () => {
       const km = estimateKm(state.pickup, state.drop);
       const v = VEHICLE_TYPES.find(x => x.id === state.vehicleType);
       const minFare = Math.round((v.base + v.perKm * km) / 5) * 5;
-      state.myFare = Math.max(minFare, state.myFare - 5); render();
+
+      state.myFare = Math.max(minFare, state.myFare - 5);
+      render();
     };
-    document.getElementById("plusBtn").onclick = () => { state.myFare += 5; render(); };
-    document.getElementById("sendOfferBtn").onclick = async () => {
+  }
+
+  if (plusBtn) {
+    plusBtn.onclick = () => {
+      state.myFare += 5;
+      render();
+    };
+  }
+
+  if (sendBtn) {
+    sendBtn.onclick = async () => {
+      if (!state.user) {
+        alert("Please log in again.");
+        return;
+      }
+
+      if (!state.pickup.trim() || !state.drop.trim()) {
+        alert("Please select pickup and drop location.");
+        return;
+      }
+
+      if (!state.myFare || state.myFare <= 0) {
+        alert("Please select a valid fare.");
+        return;
+      }
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Sending...";
+
       try {
         const km = estimateKm(state.pickup, state.drop);
-        const docRef = await db.collection("rides").add({
+
+        const rideData = {
           riderId: state.user.uid,
           riderName: state.user.displayName || "Rider",
-          pickup: state.pickup, drop: state.drop, distanceKm: km,
+          pickup: state.pickup.trim(),
+          drop: state.drop.trim(),
+          distanceKm: km,
           vehicleType: state.vehicleType,
-          riderOfferFare: state.myFare, status: "searching", offers: [],
-          acceptedDriverId: null, acceptedDriverName: null, agreedFare: null,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
+          riderOfferFare: state.myFare,
+          status: "searching",
+          offers: [],
+          acceptedDriverId: null,
+          acceptedDriverName: null,
+          agreedFare: null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        const docRef = await db.collection("rides").add(rideData);
+
         state.rideId = docRef.id;
+        state.rideData = {
+          ...rideData,
+          id: docRef.id
+        };
+
         state.step = "matching";
         render();
+
         listenToRide();
-      } catch (e) {
-        alert("Error sending offer: " + e.message);
+
+      } catch (error) {
+        console.error("SEND OFFER ERROR:", error);
+
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send Offer";
+
+        alert(
+          "Unable to send ride request.\n\n" +
+          (error.message || "Please try again.")
+        );
       }
     };
-  },
+  }
+},
   matching: () => {},
   offers: () => {
     document.querySelectorAll(".offer-card").forEach(card => {
