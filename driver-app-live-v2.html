@@ -371,6 +371,12 @@ function listenOpenRides() {
     });
   });
 }
+ setTimeout(() => {
+  if (state.step === "loading") {
+    state.step = "login";
+    render();
+  }
+}, 5000);
 
 auth.onAuthStateChanged(async (user) => {
   state.user = user;
