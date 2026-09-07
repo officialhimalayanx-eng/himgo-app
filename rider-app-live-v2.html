@@ -359,17 +359,75 @@ const attach = {
       } catch (e) { state.authError = e.message.replace("Firebase: ", ""); render(); }
     };
   },
-  home: () => {
-    document.getElementById("logoutBtn").onclick = () => auth.signOut();
-    document.getElementById("pickup").oninput = e => { state.pickup = e.target.value; state.pickupQuery = e.target.value; state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
-    document.getElementById("pickup").onfocus = () => { state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
-    document.getElementById("drop").oninput = e => { state.drop = e.target.value; state.dropQuery = e.target.value; state.activeField = "drop"; render(); document.getElementById("drop").focus(); document.getElementById("searchBtn").disabled = !state.drop.trim(); };
-    document.getElementById("drop").onfocus = () => { state.activeField = "drop"; render(); document.getElementById("drop").focus(); };
-    document.querySelectorAll(".suggestion-item").forEach(item => {
-      item.onclick = () => { const f = item.dataset.field; state[f] = item.dataset.val; state[f+"Query"] = item.dataset.val; state.activeField = null; render(); };
-    });
-    document.getElementById("searchBtn").onclick = () => { if (!state.drop.trim()) return; state.activeField = null; state.step = "vehicle"; render(); };
-  },
+
+home: () => {
+  document.getElementById("logoutBtn").onclick = () => auth.signOut();
+
+  const pickup = document.getElementById("pickup");
+  const drop = document.getElementById("drop");
+  const searchBtn = document.getElementById("searchBtn");
+
+  pickup.onfocus = () => {
+    state.activeField = "pickup";
+    render();
+  };
+
+  drop.onfocus = () => {
+    state.activeField = "drop";
+    render();
+  };
+
+  pickup.oninput = (e) => {
+    state.pickup = e.target.value;
+    state.pickupQuery = e.target.value;
+    state.activeField = "pickup";
+    render();
+
+    const input = document.getElementById("pickup");
+    if (input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  };
+
+  drop.oninput = (e) => {
+    state.drop = e.target.value;
+    state.dropQuery = e.target.value;
+    state.activeField = "drop";
+    render();
+
+    const input = document.getElementById("drop");
+    if (input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  };
+
+  document.querySelectorAll(".suggestion-item").forEach((item) => {
+    item.onclick = () => {
+      const field = item.dataset.field;
+      const value = item.dataset.val;
+
+      state[field] = value;
+      state[field + "Query"] = value;
+      state.activeField = null;
+
+      render();
+    };
+  });
+
+  searchBtn.onclick = () => {
+    if (!state.pickup.trim() || !state.drop.trim()) {
+      alert("Please select pickup and drop location.");
+      return;
+    }
+
+    state.activeField = null;
+    state.step = "vehicle";
+    render();
+  };
+},
+
   vehicle: () => {
     document.getElementById("backBtn").onclick = () => { state.step = "home"; render(); };
     document.querySelectorAll(".vehicle-option").forEach(btn => {
