@@ -384,9 +384,10 @@ const attach = {
       ]);
 
     } catch (e) {
-      state.authError = e.message.replace("Firebase: ", "");
-      render();
-    }
+  alert("Firestore error: " + e.message);
+  state.authError = e.message.replace("Firebase: ", "");
+  render();
+}
   };
 },
   home: () => {
