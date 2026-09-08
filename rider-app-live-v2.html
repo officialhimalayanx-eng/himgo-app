@@ -347,18 +347,48 @@ const attach = {
     };
   },
   signup: () => {
-    document.getElementById("toLogin").onclick = () => { state.authError=""; state.step="login"; render(); };
-    document.getElementById("signupBtn").onclick = async () => {
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-      if (!name) { state.authError = "Please enter your name"; render(); return; }
-      try {
-        const cred = await auth.createUserWithEmailAndPassword(email, password);
-        await db.collection("users").doc(cred.user.uid).set({ name, email, role: "rider", ratingSum: 0, ratingCount: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      } catch (e) { state.authError = e.message.replace("Firebase: ", ""); render(); }
-    };
-  },
+  document.getElementById("toLogin").onclick = () => {
+    state.authError = "";
+    state.step = "login";
+    render();
+  };
+
+  document.getElementById("signupBtn").onclick = async () => {
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    if (!name) {
+      state.authError = "Please enter your name";
+      render();
+      return;
+    }
+
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+
+      const userData = {
+        name,
+        email,
+        role: "rider",
+        ratingSum: 0,
+        ratingCount: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      await Promise.race([
+        db.collection("users").doc(cred.user.uid).set(userData),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Firestore write timed out. Please check Firestore connection/rules.")), 10000)
+        )
+      ]);
+
+    } catch (e) {
+      state.authError = e.message.replace("Firebase: ", "");
+      render();
+    }
+  };
+},
   home: () => {
     document.getElementById("logoutBtn").onclick = () => auth.signOut();
     document.getElementById("pickup").oninput = e => { state.pickup = e.target.value; state.pickupQuery = e.target.value; state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
