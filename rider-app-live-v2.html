@@ -479,7 +479,12 @@ const attach = {
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        const docRef = await db.collection("rides").add(rideData);
+        const docRef = await Promise.race([
+  db.collection("rides").add(rideData),
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Ride request timed out. Please check Firestore connection/rules.")), 10000)
+  )
+]);
 
         state.rideId = docRef.id;
         state.rideData = {
