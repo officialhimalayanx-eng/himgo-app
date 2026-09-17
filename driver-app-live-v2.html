@@ -128,6 +128,8 @@ let state = {
   openRidesUnsub: null,
   myRating: 0,
   ratingSubmitted: false,
+  tripHistory: [],
+  historyUnsub: null,
 };
 
 function render() {
@@ -170,7 +172,30 @@ const renderers = {
     ${brandStrip()}
     <div class="topbar"><h1>Offline</h1><div class="toggle-wrap"><span class="toggle-label">Go online</span><button class="toggle" id="onlineToggle"><div class="knob"></div></button></div></div>
     <div class="map">${mapSvg(false)}</div>
+    <div style="padding:0 20px;margin-bottom:8px;display:flex;gap:8px;">
+      <button id="historyBtn" style="flex:1;background:#262626;color:#F2F2F2;border:none;padding:10px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">Trip History</button>
+    </div>
     <div class="status-msg"><div class="icon">😴</div><p class="big">You are offline</p><p>Turn on the toggle to go online</p></div>`,
+  tripHistory: () => `
+    ${brandStrip()}
+    <div class="topbar"><button class="back-btn" id="backBtn">&#8592;</button><h1>Trip History</h1></div>
+    <div class="sheet" style="flex:1;overflow-y:auto;padding:12px 20px;">
+      ${state.tripHistory.length === 0 ? `<p style="color:#9A9A9A;text-align:center;padding:40px 20px;">No trips yet</p>` : `
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${state.tripHistory.map(trip => `
+            <div style="background:#1B1B1B;border:1px solid #262626;border-radius:12px;padding:14px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <div style="font-size:13px;color:#9A9A9A;">${new Date(trip.createdAt?.toDate?.() || trip.createdAt).toLocaleDateString()}</div>
+                <div style="font-size:13px;color:#C6FF3D;font-weight:600;">Rs ${trip.agreedFare}</div>
+              </div>
+              <div style="font-size:13px;color:#E6E6E6;margin-bottom:6px;">${trip.pickup.split(",")[0]} → ${trip.drop.split(",")[0]}</div>
+              <div style="font-size:12px;color:#9A9A9A;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.riderName || "Rider"}</div>
+              <div style="font-size:13px;color:#C6FF3D;">★ ${(trip.riderRatingGiven || 5).toFixed(1)} rating given</div>
+            </div>
+          `).join("")}
+        </div>
+      `}
+    </div>`,
   waiting: () => {
     const has = state.openRides.length > 0;
     return `
@@ -282,6 +307,11 @@ const attach = {
   },
   offline: () => {
     document.getElementById("onlineToggle").onclick = () => { state.online = true; state.step = "waiting"; render(); listenOpenRides(); };
+    const histBtn = document.getElementById("historyBtn");
+    if (histBtn) histBtn.onclick = () => { state.step = "tripHistory"; loadTripHistory(); render(); };
+  },
+  tripHistory: () => {
+    document.getElementById("backBtn").onclick = () => { state.step = "offline"; if (state.historyUnsub) state.historyUnsub(); render(); };
   },
   waiting: () => {
     document.getElementById("onlineToggle").onclick = () => { state.online = false; state.step = "offline"; if (state.openRidesUnsub) state.openRidesUnsub(); render(); };
@@ -371,12 +401,19 @@ function listenOpenRides() {
     });
   });
 }
- setTimeout(() => {
-  if (state.step === "loading") {
-    state.step = "login";
-    render();
-  }
-}, 5000);
+
+async function loadTripHistory() {
+  if (state.historyUnsub) state.historyUnsub();
+  state.historyUnsub = db.collection("rides")
+    .where("acceptedDriverId", "==", state.user.uid)
+    .where("status", "==", "completed")
+    .orderBy("createdAt", "desc")
+    .limit(50)
+    .onSnapshot((snap) => {
+      state.tripHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    });
+}
 
 auth.onAuthStateChanged(async (user) => {
   state.user = user;
