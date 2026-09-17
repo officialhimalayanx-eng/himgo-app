@@ -27,7 +27,7 @@
   .field { display: flex; align-items: center; gap: 12px; background: #262626; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #C6FF3D; flex-shrink: 0; }
   .dot.pin { background: #FF5C5C; border-radius: 3px; }
-  .field input, .field select { border: none; background: transparent; outline: none; font-size: 14px; color: #F2F2F2; flex: 1; font-family: inherit; }
+  .field input, .field select { border: none; background: transparent; outline: none; font-size: 14px; color: #F2F2F2; flex: 1; font-family: inherit; pointer-events: auto; cursor: text; -webkit-user-select: text; user-select: text; }
   .field input::placeholder { color: #7A7A7A; }
   .field-wrap { position: relative; margin-bottom: 8px; }
   .field-wrap .field { margin-bottom: 0; }
@@ -180,6 +180,8 @@ let state = {
   unsub: null,
   myRating: 0,
   ratingSubmitted: false,
+  tripHistory: [],
+  historyUnsub: null,
 };
 
 function render() {
@@ -220,6 +222,10 @@ const renderers = {
   home: () => `
     ${brandStrip()}
     <div class="topbar"><h1>Where to?</h1><button class="back-btn" id="logoutBtn" style="margin-left:auto;font-size:11px;">Log Out</button></div>
+    <div style="display:flex;gap:8px;padding:0 20px;margin-bottom:8px;">
+      <button id="bookBtn" style="flex:1;background:#C6FF3D;color:#0E1A00;border:none;padding:10px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">Book a Ride</button>
+      <button id="historyBtn" style="flex:1;background:#262626;color:#F2F2F2;border:none;padding:10px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">Trip History</button>
+    </div>
     <div class="map">${mapSvg(false)}</div>
     <div class="sheet">
       <div class="field-wrap">
@@ -231,6 +237,26 @@ const renderers = {
         ${state.activeField === "drop" && matchPlaces(state.dropQuery).length ? `<div class="suggestions">${matchPlaces(state.dropQuery).map(p => `<div class="suggestion-item" data-field="drop" data-val="${p}"><span class="pin-ic">&#9673;</span>${p}</div>`).join("")}</div>` : ""}
       </div>
       <button class="primary-btn" id="searchBtn" ${state.drop.trim() ? "" : "disabled"}>Continue</button>
+    </div>`,
+  tripHistory: () => `
+    ${brandStrip()}
+    <div class="topbar"><button class="back-btn" id="backBtn">&#8592;</button><h1>Trip History</h1></div>
+    <div class="sheet" style="flex:1;overflow-y:auto;padding:12px 20px;">
+      ${state.tripHistory.length === 0 ? `<p style="color:#9A9A9A;text-align:center;padding:40px 20px;">No trips yet</p>` : `
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${state.tripHistory.map(trip => `
+            <div style="background:#1B1B1B;border:1px solid #262626;border-radius:12px;padding:14px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <div style="font-size:13px;color:#9A9A9A;">${new Date(trip.createdAt?.toDate?.() || trip.createdAt).toLocaleDateString()}</div>
+                <div style="font-size:13px;color:#C6FF3D;font-weight:600;">Rs ${trip.agreedFare}</div>
+              </div>
+              <div style="font-size:13px;color:#E6E6E6;margin-bottom:6px;">${trip.pickup.split(",")[0]} → ${trip.drop.split(",")[0]}</div>
+              <div style="font-size:12px;color:#9A9A9A;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.acceptedDriverName || "Driver"}</div>
+              <div style="font-size:13px;color:#C6FF3D;">★ ${(trip.driverRatingGiven || 5).toFixed(1)} rating given</div>
+            </div>
+          `).join("")}
+        </div>
+      `}
     </div>`,
   vehicle: () => {
     const km = estimateKm(state.pickup, state.drop);
@@ -361,6 +387,12 @@ const attach = {
   },
   home: () => {
     document.getElementById("logoutBtn").onclick = () => auth.signOut();
+    document.getElementById("bookBtn").onclick = () => render(); // already on home, just refresh
+    document.getElementById("historyBtn").onclick = () => {
+      state.step = "tripHistory";
+      loadTripHistory();
+      render();
+    };
     const pickupInput = document.getElementById("pickup");
     const dropInput = document.getElementById("drop");
     
@@ -381,6 +413,9 @@ const attach = {
       item.onclick = () => { const f = item.dataset.field; state[f] = item.dataset.val; state[f+"Query"] = item.dataset.val; state.activeField = null; render(); };
     });
     document.getElementById("searchBtn").onclick = () => { if (!state.drop.trim()) return; state.activeField = null; state.step = "vehicle"; render(); };
+  },
+  tripHistory: () => {
+    document.getElementById("backBtn").onclick = () => { state.step = "home"; if (state.historyUnsub) state.historyUnsub(); render(); };
   },
   vehicle: () => {
     document.getElementById("backBtn").onclick = () => { state.step = "home"; render(); };
@@ -463,6 +498,19 @@ function listenToRide() {
     else if (data.status === "completed") state.step = "complete";
     render();
   });
+}
+
+async function loadTripHistory() {
+  if (state.historyUnsub) state.historyUnsub();
+  state.historyUnsub = db.collection("rides")
+    .where("riderId", "==", state.user.uid)
+    .where("status", "==", "completed")
+    .orderBy("createdAt", "desc")
+    .limit(50)
+    .onSnapshot((snap) => {
+      state.tripHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    });
 }
 
 auth.onAuthStateChanged((user) => {
