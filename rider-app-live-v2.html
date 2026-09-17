@@ -223,11 +223,11 @@ const renderers = {
     <div class="map">${mapSvg(false)}</div>
     <div class="sheet">
       <div class="field-wrap">
-        <div class="field"><div class="dot"></div><input id="pickup" autocomplete="off" value="${state.pickup}" placeholder="Pickup location"/></div>
+        <div class="field"><div class="dot"></div><input type="text" id="pickup" autocomplete="off" value="${state.pickup}" placeholder="Pickup location"/></div>
         ${state.activeField === "pickup" && matchPlaces(state.pickupQuery).length ? `<div class="suggestions">${matchPlaces(state.pickupQuery).map(p => `<div class="suggestion-item" data-field="pickup" data-val="${p}"><span class="pin-ic">&#9679;</span>${p}</div>`).join("")}</div>` : ""}
       </div>
       <div class="field-wrap">
-        <div class="field"><div class="dot pin"></div><input id="drop" autocomplete="off" value="${state.drop}" placeholder="Where are you going?"/></div>
+        <div class="field"><div class="dot pin"></div><input type="text" id="drop" autocomplete="off" value="${state.drop}" placeholder="Where are you going?"/></div>
         ${state.activeField === "drop" && matchPlaces(state.dropQuery).length ? `<div class="suggestions">${matchPlaces(state.dropQuery).map(p => `<div class="suggestion-item" data-field="drop" data-val="${p}"><span class="pin-ic">&#9673;</span>${p}</div>`).join("")}</div>` : ""}
       </div>
       <button class="primary-btn" id="searchBtn" ${state.drop.trim() ? "" : "disabled"}>Continue</button>
