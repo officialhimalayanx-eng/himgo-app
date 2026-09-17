@@ -347,55 +347,36 @@ const attach = {
     };
   },
   signup: () => {
-  document.getElementById("toLogin").onclick = () => {
-    state.authError = "";
-    state.step = "login";
-    render();
-  };
-
-  document.getElementById("signupBtn").onclick = async () => {
-    const name = document.getElementById("name").value.trim();
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-
-    if (!name) {
-      state.authError = "Please enter your name";
-      render();
-      return;
-    }
-
-    try {
-      const cred = await auth.createUserWithEmailAndPassword(email, password);
-
-      const userData = {
-        name,
-        email,
-        role: "rider",
-        ratingSum: 0,
-        ratingCount: 0,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      await Promise.race([
-        db.collection("users").doc(cred.user.uid).set(userData),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Firestore write timed out. Please check Firestore connection/rules.")), 10000)
-        )
-      ]);
-
-    } catch (e) {
-  alert("Firestore error: " + e.message);
-  state.authError = e.message.replace("Firebase: ", "");
-  render();
-}
-  };
-},
+    document.getElementById("toLogin").onclick = () => { state.authError=""; state.step="login"; render(); };
+    document.getElementById("signupBtn").onclick = async () => {
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!name) { state.authError = "Please enter your name"; render(); return; }
+      try {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        await db.collection("users").doc(cred.user.uid).set({ name, email, role: "rider", ratingSum: 0, ratingCount: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      } catch (e) { state.authError = e.message.replace("Firebase: ", ""); render(); }
+    };
+  },
   home: () => {
     document.getElementById("logoutBtn").onclick = () => auth.signOut();
-    document.getElementById("pickup").oninput = e => { state.pickup = e.target.value; state.pickupQuery = e.target.value; state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
-    document.getElementById("pickup").onfocus = () => { state.activeField = "pickup"; render(); document.getElementById("pickup").focus(); };
-    document.getElementById("drop").oninput = e => { state.drop = e.target.value; state.dropQuery = e.target.value; state.activeField = "drop"; render(); document.getElementById("drop").focus(); document.getElementById("searchBtn").disabled = !state.drop.trim(); };
-    document.getElementById("drop").onfocus = () => { state.activeField = "drop"; render(); document.getElementById("drop").focus(); };
+    const pickupInput = document.getElementById("pickup");
+    const dropInput = document.getElementById("drop");
+    
+    pickupInput.onclick = () => { state.activeField = "pickup"; render(); setTimeout(() => document.getElementById("pickup").focus(), 50); };
+    pickupInput.onfocus = () => { state.activeField = "pickup"; render(); };
+    pickupInput.oninput = (e) => { state.pickup = e.target.value; state.pickupQuery = e.target.value; render(); };
+    
+    dropInput.onclick = () => { state.activeField = "drop"; render(); setTimeout(() => document.getElementById("drop").focus(), 50); };
+    dropInput.onfocus = () => { state.activeField = "drop"; render(); };
+    dropInput.oninput = (e) => { 
+      state.drop = e.target.value; 
+      state.dropQuery = e.target.value; 
+      document.getElementById("searchBtn").disabled = !state.drop.trim(); 
+      render(); 
+    };
+    
     document.querySelectorAll(".suggestion-item").forEach(item => {
       item.onclick = () => { const f = item.dataset.field; state[f] = item.dataset.val; state[f+"Query"] = item.dataset.val; state.activeField = null; render(); };
     });
@@ -409,108 +390,31 @@ const attach = {
     document.getElementById("nextBtn").onclick = () => { state.myFare = 0; state.step = "offer"; render(); };
   },
   offer: () => {
-  const backBtn = document.getElementById("backBtn");
-  const minusBtn = document.getElementById("minusBtn");
-  const plusBtn = document.getElementById("plusBtn");
-  const sendBtn = document.getElementById("sendOfferBtn");
-
-  if (backBtn) {
-    backBtn.onclick = () => {
-      state.step = "vehicle";
-      state.myFare = 0;
-      render();
-    };
-  }
-
-  if (minusBtn) {
-    minusBtn.onclick = () => {
+    document.getElementById("backBtn").onclick = () => { state.step = "vehicle"; render(); };
+    document.getElementById("minusBtn").onclick = () => {
       const km = estimateKm(state.pickup, state.drop);
       const v = VEHICLE_TYPES.find(x => x.id === state.vehicleType);
       const minFare = Math.round((v.base + v.perKm * km) / 5) * 5;
-
-      state.myFare = Math.max(minFare, state.myFare - 5);
+      state.myFare = Math.max(minFare, state.myFare - 5); render();
+    };
+    document.getElementById("plusBtn").onclick = () => { state.myFare += 5; render(); };
+    document.getElementById("sendOfferBtn").onclick = async () => {
+      const km = estimateKm(state.pickup, state.drop);
+      const docRef = await db.collection("rides").add({
+        riderId: state.user.uid,
+        riderName: state.user.displayName || "Rider",
+        pickup: state.pickup, drop: state.drop, distanceKm: km,
+        vehicleType: state.vehicleType,
+        riderOfferFare: state.myFare, status: "searching", offers: [],
+        acceptedDriverId: null, acceptedDriverName: null, agreedFare: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      state.rideId = docRef.id;
+      state.step = "matching";
       render();
+      listenToRide();
     };
-  }
-
-  if (plusBtn) {
-    plusBtn.onclick = () => {
-      state.myFare += 5;
-      render();
-    };
-  }
-
-  if (sendBtn) {
-    sendBtn.onclick = async () => {
-      if (!state.user) {
-        alert("Please log in again.");
-        return;
-      }
-
-      if (!state.pickup.trim() || !state.drop.trim()) {
-        alert("Please select pickup and drop location.");
-        return;
-      }
-
-      if (!state.myFare || state.myFare <= 0) {
-        alert("Please select a valid fare.");
-        return;
-      }
-
-      sendBtn.disabled = true;
-      sendBtn.textContent = "Sending...";
-
-      try {
-        const km = estimateKm(state.pickup, state.drop);
-
-        const rideData = {
-          riderId: state.user.uid,
-          riderName: state.user.displayName || "Rider",
-          pickup: state.pickup.trim(),
-          drop: state.drop.trim(),
-          distanceKm: km,
-          vehicleType: state.vehicleType,
-          riderOfferFare: state.myFare,
-          status: "searching",
-          offers: [],
-          acceptedDriverId: null,
-          acceptedDriverName: null,
-          agreedFare: null,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        const docRef = await Promise.race([
-  db.collection("rides").add(rideData),
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Ride request timed out. Please check Firestore connection/rules.")), 10000)
-  )
-]);
-
-        state.rideId = docRef.id;
-        state.rideData = {
-          ...rideData,
-          id: docRef.id
-        };
-
-        state.step = "matching";
-        render();
-
-        listenToRide();
-
-      } catch (error) {
-        console.error("SEND OFFER ERROR:", error);
-
-        sendBtn.disabled = false;
-        sendBtn.textContent = "Send Offer";
-
-        alert(
-          "Unable to send ride request.\n\n" +
-          (error.message || "Please try again.")
-        );
-      }
-    };
-  }
-},
+  },
   matching: () => {},
   offers: () => {
     document.querySelectorAll(".offer-card").forEach(card => {
